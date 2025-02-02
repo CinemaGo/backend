@@ -19,6 +19,7 @@ func Router(h *ServeHandlersWrapper) *gin.Engine {
 		v1.GET("/home", h.MainPage)
 		v1.GET("/explore/movies",h.ExploreAllMovies)
 		v1.GET("/movies/:movieName/MV:movieID",h.Movie)
+		v1.GET("/person/:personName/:actorCrewID",h.ActorCrew)
 	}
 
 	return router

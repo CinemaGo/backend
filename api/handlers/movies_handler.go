@@ -51,7 +51,7 @@ func (service *MoviesHandler) ExploreAllMovies(c *gin.Context) {
 }
 
 func (service *MoviesHandler) Movie(c *gin.Context) {
-	movieID, err := helpers.GetParameterFromURL(c, "movieID", "Invalid movie ID provided.")
+	movieID, err := helpers.GetParameterFromURL(c, "movieID", "invalid movie ID provided.")
 	if err != nil {
 		helpers.ClientError(c, http.StatusBadRequest, fmt.Sprintf("%v", err))
 		return
@@ -80,5 +80,38 @@ func (service *MoviesHandler) Movie(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"movies":      movies,
 		"actorsCrews": actorsCrews,
+	})
+}
+
+func (service *MoviesHandler) ActorCrew(c *gin.Context) {
+	actorCrewID, err := helpers.GetParameterFromURL(c, "actorCrewID", "invalid person ID provided.")
+	if err != nil {
+		helpers.ClientError(c, http.StatusBadRequest, fmt.Sprintf("%v", err))
+		return
+	}
+
+	actorCrew, err := service.movie.FetchActorCrewInfo(actorCrewID)
+	if err != nil {
+		if errors.Is(err, services.ErrActorCrewNotFoundByID) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("persone with the gived ID %v not found", actorCrewID))
+			return
+		}
+		helpers.ServerError(c, err)
+		return
+	}
+
+	movies, err := service.movie.FetchMoviesByActorCrewID(actorCrewID)
+	if err != nil {
+		if errors.Is(err, services.ErrActorCrewNotFoundByID) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("persone with the gived ID %v not found", actorCrewID))
+			return
+		}
+		helpers.ServerError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"person": actorCrew,
+		"movies": movies,
 	})
 }

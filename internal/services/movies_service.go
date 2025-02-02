@@ -11,6 +11,8 @@ type MoviesServiceInterface interface {
 	FetchAllMovies() ([]models.AllMovies, error)
 	FetchAMovie(movieID int) (models.Movie, error)
 	FetchAllActorsCrewsByMovieID(movieID int) ([]models.ActorsCrewsOfMovie, error)
+	FetchActorCrewInfo(actorCrewID int) (models.ActorCrewInfo, error)
+	FetchMoviesByActorCrewID(actorCrewID int) ([]models.ActorCrewMovies, error)
 }
 
 type MoviesService struct {
@@ -121,4 +123,54 @@ func (ms *MoviesService) FetchAllActorsCrewsByMovieID(movieID int) ([]models.Act
 
 	// Return the list of actors/crew if no errors occurred
 	return allActorsCrew, nil
+}
+
+// FetchActorCrewInfo retrieves the detailed information of an actor or crew member by their ID.
+// It calls the database function RetriveActorCrewInfo and handles specific errors gracefully.
+//
+// Parameters:
+// - actorCrewID (int): The ID of the actor or crew member whose details are being fetched.
+//
+// Returns:
+// - models.ActorCrewInfo: The detailed information of the actor/crew member if found.
+// - error: Returns nil if the retrieval was successful, or an error if any occurred during the process.
+func (ms *MoviesService) FetchActorCrewInfo(actorCrewID int) (models.ActorCrewInfo, error) {
+	// Fetch actor/crew info from the database
+	actorCrewInfo, err := ms.db.RetriveActorCrewInfo(actorCrewID)
+	if err != nil {
+		// Handle specific error when the actor/crew member is not found by ID
+		if errors.Is(err, models.ErrActorCrewNotFoundByID) {
+			return models.ActorCrewInfo{}, ErrActorCrewNotFoundByID
+		}
+		// Wrap and return any other errors
+		return models.ActorCrewInfo{}, fmt.Errorf("error occurred while fetching actor or crew info in the service section: %w", err)
+	}
+
+	// Return the fetched actor/crew information
+	return actorCrewInfo, nil
+}
+
+// FetchMoviesByActorCrewID retrieves all movies associated with a specific actor or crew member,
+// based on the provided actorCrewID.
+//
+// Parameters:
+// - actorCrewID (int): The ID of the actor or crew member whose associated movies are being fetched.
+//
+// Returns:
+// - []models.ActorCrewMovies: A slice of ActorCrewMovies structs containing movie details for the given actor or crew member.
+// - error: Returns nil if the retrieval was successful, or an error if any occurred during the process.
+func (ms *MoviesService) FetchMoviesByActorCrewID(actorCrewID int) ([]models.ActorCrewMovies, error) {
+	// Call the database function to retrieve the list of movies by actor/crew ID
+	actorCrewMovies, err := ms.db.RetrieveMoviesByActorCrewID(actorCrewID)
+	if err != nil {
+		// If the actor/crew is not found, return the specific error
+		if errors.Is(err, models.ErrActorCrewNotFoundByID) {
+			return nil, ErrActorCrewNotFoundByID
+		}
+		// Wrap any other errors with additional context
+		return nil, fmt.Errorf("error occurred while fetching all movies of actors or crews in the service section: %v", err)
+	}
+
+	// Return the fetched list of actor/crew movies
+	return actorCrewMovies, nil
 }

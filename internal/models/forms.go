@@ -38,3 +38,20 @@ type ActorsCrewsOfMovie struct {
 	RoleDescription string
 	IsActor         bool
 }
+
+type ActorCrewInfo struct {
+	ID              int
+	FullName        string
+	ImageURL        string
+	Occupation      string
+	RoleDescription string
+	BornDate        string
+	Birthplace      string
+	About           string
+}
+
+type ActorCrewMovies struct {
+	ID        int
+	Title     string
+	PosterUrl string
+}

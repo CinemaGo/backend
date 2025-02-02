@@ -11,6 +11,8 @@ type DBContractMovies interface {
 	RetrieveAllMovies() ([]AllMovies, error)
 	RetrieveAMovie(movieID int) (Movie, error)
 	RetrieveAllActorsCrewsByMovieID(movieID int) ([]ActorsCrewsOfMovie, error)
+	RetriveActorCrewInfo(actorCrewID int) (ActorCrewInfo, error)
+	RetrieveMoviesByActorCrewID(actorCrewID int) ([]ActorCrewMovies, error)
 }
 
 type Movies struct {
@@ -171,4 +173,85 @@ func (psql *Postgres) RetrieveAllActorsCrewsByMovieID(movieID int) ([]ActorsCrew
 
 	// Return the result slice
 	return allActorsCrew, nil
+}
+
+// RetriveActorCrewInfo retrieves detailed information about an actor or crew member
+// from the database based on the provided actorCrewID.
+//
+// Parameters:
+// - actorCrewID: The ID of the actor or crew member whose details are being retrieved.
+//
+// Returns:
+// - ActorCrewInfo: A struct containing detailed information about the actor/crew member.
+// - An error if there are issues with the database query or scanning the data.
+func (psql *Postgres) RetriveActorCrewInfo(actorCrewID int) (ActorCrewInfo, error) {
+	// SQL query to retrieve detailed actor/crew info by ID
+	stmt := `SELECT id, full_name, image_url, occupation, role_description, born_date, birthplace, about FROM actors_crew WHERE id = $1`
+
+	// Declare a variable to hold the actor/crew info
+	var actorCrewInfo ActorCrewInfo
+	row := psql.DB.QueryRow(stmt, actorCrewID)
+
+	// Scan the query result into the actorCrewInfo struct
+	err := row.Scan(&actorCrewInfo.ID, &actorCrewInfo.FullName, &actorCrewInfo.ImageURL, &actorCrewInfo.Occupation,
+		&actorCrewInfo.RoleDescription, &actorCrewInfo.BornDate, &actorCrewInfo.Birthplace, &actorCrewInfo.About)
+
+	// Error handling: check if no rows are returned or other scanning errors
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ActorCrewInfo{}, ErrActorCrewNotFoundByID // Return a custom error if no rows are found
+		}
+		return ActorCrewInfo{}, fmt.Errorf("failed to scan actor or crew info: %w", err) // Wrap other errors with context
+	}
+
+	// Return the actor/crew member's information if successful
+	return actorCrewInfo, nil
+}
+
+// RetrieveMoviesByActorCrewID retrieves all movies associated with a specific actor or crew member,
+// based on the provided actorCrewID.
+//
+// Parameters:
+// - actorCrewID (int): The ID of the actor or crew member whose associated movies are being fetched.
+//
+// Returns:
+// - []ActorCrewMovies: A slice of ActorCrewMovies structs containing movie details for the given actor or crew member.
+// - error: Returns nil if the retrieval was successful, or an error if any occurred during the process.
+func (psql *Postgres) RetrieveMoviesByActorCrewID(actorCrewID int) ([]ActorCrewMovies, error) {
+	// SQL query to fetch all movies associated with a specific actor or crew member
+	stmt := `SELECT m.id AS movie_id, m.title AS movie_title, m.poster_url FROM movies m JOIN movie_actors_crew mac ON m.id = mac.movie_id JOIN actors_crew ac ON mac.actor_crew_id = ac.id WHERE ac.id = $1`
+
+	// Execute the query and handle any errors
+	rows, err := psql.DB.Query(stmt, actorCrewID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve all movies of actors or crews: %w", err)
+	}
+
+	// Ensure the rows are closed when done
+	defer rows.Close()
+
+	// Declare a slice to store the actor/crew's movies
+	var actorCrewMovies []ActorCrewMovies
+
+	// Iterate over the rows and scan the data into the struct
+	for rows.Next() {
+		var acMovie ActorCrewMovies
+
+		// Scan the row data into the struct fields
+		err := rows.Scan(&acMovie.ID, &acMovie.Title, &acMovie.PosterUrl)
+		if err != nil {
+			// If no rows were found for the actor/crew ID, return a specific error
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrActorCrewNotFoundByID 
+			}
+			// Wrap any other errors with context for better debugging
+			return nil, fmt.Errorf("failed to scan a movie of the actor or crew: %w", err)
+		}
+
+		// Append the movie data to the slice
+		actorCrewMovies = append(actorCrewMovies, acMovie)
+	}
+
+	// Return the list of actor/crew movies and nil for the error if everything was successful
+	return actorCrewMovies, nil
 }
