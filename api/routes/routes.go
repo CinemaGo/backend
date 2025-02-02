@@ -6,11 +6,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Router() *gin.Engine {
+type ServeHandlersWrapper struct {
+	*handlers.MoviesHandler
+}
+
+func Router(h *ServeHandlersWrapper) *gin.Engine {
 
 	router := gin.Default()
 
-	router.GET("/", handlers.MainPage)
+	v1 := router.Group("/api/v1")
+	{
+		v1.GET("/", h.MainPage)
+	}
 
 	return router
 }

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"cinemaGo/backend/api/handlers"
 	"cinemaGo/backend/api/routes"
 	"cinemaGo/backend/internal/models"
+	"cinemaGo/backend/internal/services"
 	"cinemaGo/backend/pkg/configs"
 	"fmt"
 	"log"
@@ -49,11 +51,11 @@ func main() {
 
 	// Construct the database connection string using the loaded environment variables.
 	// The connection string includes the user, password, database name, and SSL mode.
-	dbConnStr := fmt.Sprintf("user=%v password=%v dbname=%v sslmode=%v", dbUserName, dbUserPassword, dbName, dbSSLMode)
+	dsn := fmt.Sprintf("user=%v password=%v dbname=%v sslmode=%v", dbUserName, dbUserPassword, dbName, dbSSLMode)
 
 	// Open a connection to the database using the connection string.
 	// If the connection fails, the program will terminate with an error message.
-	db, err := models.OpenDB(dbConnStr)
+	db, err := models.OpenDB(dsn)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
@@ -61,7 +63,14 @@ func main() {
 	// Ensure the database connection is closed when the program exits.
 	defer db.Close()
 
-	router := routes.Router()
+	moviesService := services.NewMoviesService(db)
+	moviesHandler := handlers.NewMoviesHandler(moviesService)
+
+	serveHandlersWrapper := routes.ServeHandlersWrapper{
+		MoviesHandler: moviesHandler,
+	}
+	
+	router := routes.Router(&serveHandlersWrapper)
 
 	router.Run()
 }
