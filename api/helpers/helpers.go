@@ -1,8 +1,10 @@
 package helpers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,4 +48,29 @@ func ClientError(c *gin.Context, code int, message string) {
 	c.JSON(code, gin.H{
 		"error": message, // Key "error" is a good convention
 	})
+}
+
+// GetParameterFromURL extracts the specified parameter from the URL and validates it.
+//
+// Parameters:
+// - c: The gin context object used to retrieve URL parameters.
+// - parameter: The name of the parameter to extract from the URL.
+// - message: The error message to return if the parameter is invalid.
+//
+// Returns:
+// - The parsed integer value of the parameter if valid.
+// - An error if the parameter is invalid or cannot be parsed.
+func GetParameterFromURL(c *gin.Context, parameter, message string) (int, error) {
+	// Get the parameter from the URL
+	paramStr := c.Param(parameter)
+
+	// Convert the string parameter to an integer
+	param, err := strconv.Atoi(paramStr)
+	if err != nil || param <= 0 {
+		// Return an error if the parameter is invalid
+		return 0, fmt.Errorf("%v", message)
+	}
+
+	// Return the valid parameter
+	return param, nil
 }
