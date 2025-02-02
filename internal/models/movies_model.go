@@ -4,6 +4,7 @@ import "fmt"
 
 type DBContractMovies interface {
 	RetrieveAllCarouselImages() ([]CarouselImage, error)
+	RetrieveAllMovies() ([]AllMovies, error)
 }
 
 type Movies struct {
@@ -48,4 +49,41 @@ func (psql *Postgres) RetrieveAllCarouselImages() ([]CarouselImage, error) {
 	}
 	// Return the slice of carousel images
 	return carouselImages, nil
+}
+
+// RetrieveAllMovies retrieves all movie records from the database.
+//
+// Parameters:
+// - psql: a pointer to the Postgres struct, which contains the database connection
+//         and is responsible for querying the database.
+//
+// Returns:
+// - A slice of AllMovies structs containing movie details like ID, title, language,
+//   poster URL, rating, rating provider, and age limit.
+// - An error if the database query fails or if there are issues scanning the results.
+func (psql *Postgres) RetrieveAllMovies() ([]AllMovies, error) {
+	stmt := `SELECT id, title, genre, language, poster_url, rating, rating_provider, age_limit FROM movies`
+
+	// Execute the SQL query to fetch all movies from the database
+	rows, err := psql.DB.Query(stmt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve all movies from the database: %w", err)
+	}
+
+	defer rows.Close()
+
+	var movies []AllMovies
+
+	// Loop through the rows and scan the values into AllMovies struct
+	for rows.Next() {
+		var movie AllMovies
+		err := rows.Scan(&movie.ID, &movie.Title, &movie.Genre, &movie.Language, &movie.PosterUrl, &movie.Rating, &movie.RatingProvider, &movie.AgeLimit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan all movies: %w", err)
+		}
+		movies = append(movies, movie)
+	}
+
+	// Return the slice of movies
+	return movies, nil
 }

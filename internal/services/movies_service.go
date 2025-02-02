@@ -7,6 +7,7 @@ import (
 
 type MoviesServiceInterface interface {
 	FetchAllCaruselImages() ([]models.CarouselImage, error)
+	FetchAllMovies() ([]models.AllMovies, error)
 }
 
 type MoviesService struct {
@@ -39,4 +40,31 @@ func (ms *MoviesService) FetchAllCaruselImages() ([]models.CarouselImage, error)
 
 	// Return the fetched carousel images
 	return carouselImages, nil
+}
+
+// FetchAllMovies retrieves all movies from the database and converts the movie ratings
+// from a 0-100 scale to a 0-10 scale.
+//
+// Parameters:
+//   - ms: a pointer to the MoviesService struct, which contains the logic for interacting
+//     with the database and transforming data.
+//
+// Returns:
+// - A slice of models.AllMovies containing all movie data with the adjusted ratings.
+// - An error if there is an issue fetching movies from the database or processing the data.
+func (ms *MoviesService) FetchAllMovies() ([]models.AllMovies, error) {
+	// Retrieve all movies from the database using the db layer
+	movies, err := ms.db.RetrieveAllMovies()
+	if err != nil {
+		// Return a formatted error if the movie retrieval fails
+		return nil, fmt.Errorf("error occured while fetching all movies in the service section: %w", err)
+	}
+
+	// Convert movie ratings from a 0-100 scale to a 0-10 scale.
+	for i := range movies {
+		movies[i].Rating = movies[i].Rating / 10.0
+	}
+
+	// Return the slice of movies with adjusted ratings
+	return movies, nil
 }

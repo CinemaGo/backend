@@ -24,7 +24,14 @@ func (service *MoviesHandler) MainPage(c *gin.Context) {
 		return
 	}
 
+	movies, err := service.movie.FetchAllMovies()
+	if err != nil {
+		helpers.ServerError(c, err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"carouselImages": carouselImages,
+		"movies":      movies,
 	})
 }
