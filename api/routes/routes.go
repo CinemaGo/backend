@@ -2,12 +2,14 @@ package routes
 
 import (
 	"cinemaGo/backend/api/handlers"
+	"cinemaGo/backend/api/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
 
 type ServeHandlersWrapper struct {
 	*handlers.MoviesHandler
+	*handlers.UsersHandler
 }
 
 func Router(h *ServeHandlersWrapper) *gin.Engine {
@@ -17,9 +19,16 @@ func Router(h *ServeHandlersWrapper) *gin.Engine {
 	v1 := router.Group("/api/v1")
 	{
 		v1.GET("/home", h.MainPage)
-		v1.GET("/explore/movies",h.ExploreAllShows)
-		v1.GET("/movies/:movieName/MV:movieID",h.Movie)
-		v1.GET("/person/:personName/:actorCrewID",h.ActorCrew)
+		v1.GET("/explore/movies", h.ExploreAllShows)
+		v1.GET("/movies/:movieName/MV:movieID", h.Movie)
+		v1.GET("/person/:personName/:actorCrewID", h.ActorCrew)
+
+		v1.POST("/user/signup", h.SignUp)
+		v1.POST("/user/login", h.Login)
+
+		v1.GET("/my-profile/edit", middlewares.UserAuthorizationJWT(), h.UserProfile)
+		v1.PUT("/my-profile/edit", middlewares.UserAuthorizationJWT(), h.UpdateUserProfile)
+		v1.POST("/my-profile/logout", middlewares.UserAuthorizationJWT(), h.Logout)
 	}
 
 	return router

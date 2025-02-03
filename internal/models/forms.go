@@ -56,3 +56,10 @@ type ActorCrewMovies struct {
 	Title     string
 	PosterUrl string
 }
+
+type UserInfo struct {
+	Name        string
+	Surname     string
+	Email       string
+	PhoneNumber string
+}

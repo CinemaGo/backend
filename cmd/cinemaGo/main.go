@@ -69,8 +69,15 @@ func main() {
 	}
 	moviesHandler := handlers.NewMoviesHandler(moviesService)
 
+	usersService, err := services.NewUsersService(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	usersHandler := handlers.NewUsersHandler(usersService)
+
 	serveHandlersWrapper := routes.ServeHandlersWrapper{
 		MoviesHandler: moviesHandler,
+		UsersHandler:  usersHandler,
 	}
 
 	router := routes.Router(&serveHandlersWrapper)
