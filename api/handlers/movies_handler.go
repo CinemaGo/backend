@@ -26,7 +26,8 @@ func (service *MoviesHandler) MainPage(c *gin.Context) {
 		return
 	}
 
-	movies, err := service.movie.FetchAllMovies()
+	showsMovie, err := service.movie.FetchAllShowsMovie()
+
 	if err != nil {
 		helpers.ServerError(c, err)
 		return
@@ -34,19 +35,19 @@ func (service *MoviesHandler) MainPage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"carouselImages": carouselImages,
-		"movies":         movies,
+		"showsMovie":     showsMovie,
 	})
 }
 
-func (service *MoviesHandler) ExploreAllMovies(c *gin.Context) {
-	movies, err := service.movie.FetchAllMovies()
+func (service *MoviesHandler) ExploreAllShows(c *gin.Context) {
+	showsMovie, err := service.movie.FetchAllShowsMovie()
 	if err != nil {
 		helpers.ServerError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"movies": movies,
+		"showsMovie": showsMovie,
 	})
 }
 
@@ -57,7 +58,7 @@ func (service *MoviesHandler) Movie(c *gin.Context) {
 		return
 	}
 
-	movies, err := service.movie.FetchAMovie(movieID)
+	aShowMovie, err := service.movie.FetchAShowMovie(movieID)
 	if err != nil {
 		if errors.Is(err, services.ErrMovieNotFoundByID) {
 			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("movie with the given ID %v not found", movieID))
@@ -78,7 +79,7 @@ func (service *MoviesHandler) Movie(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"movies":      movies,
+		"aShowMovie":  aShowMovie,
 		"actorsCrews": actorsCrews,
 	})
 }

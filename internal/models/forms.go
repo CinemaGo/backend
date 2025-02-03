@@ -5,15 +5,16 @@ type CarouselImage struct {
 	ImageURL string
 }
 
-type AllMovies struct {
-	ID             int
-	Title          string
-	Genre          string
-	Language       string
-	PosterUrl      string
-	Rating         float32
-	RatingProvider string
-	AgeLimit       string
+type AllShowsMovie struct {
+	ShowID              int
+	MovieID             int
+	MovieTitle          string
+	MovieGenre          string
+	MovieLanguage       string
+	MoviePosterUrl      string
+	MovieRating         float32
+	MovieRatingProvider string
+	MovieAgeLimit       string
 }
 
 type Movie struct {

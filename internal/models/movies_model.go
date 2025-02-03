@@ -8,7 +8,7 @@ import (
 
 type DBContractMovies interface {
 	RetrieveAllCarouselImages() ([]CarouselImage, error)
-	RetrieveAllMovies() ([]AllMovies, error)
+	RetrieveAllShowsMovie() ([]AllShowsMovie, error)
 	RetrieveAMovie(movieID int) (Movie, error)
 	RetrieveAllActorsCrewsByMovieID(movieID int) ([]ActorsCrewsOfMovie, error)
 	RetriveActorCrewInfo(actorCrewID int) (ActorCrewInfo, error)
@@ -59,20 +59,9 @@ func (psql *Postgres) RetrieveAllCarouselImages() ([]CarouselImage, error) {
 	return carouselImages, nil
 }
 
-// RetrieveAllMovies retrieves all movie records from the database.
-//
-// Parameters:
-//   - psql: a pointer to the Postgres struct, which contains the database connection
-//     and is responsible for querying the database.
-//
-// Returns:
-//   - A slice of AllMovies structs containing movie details like ID, title, language,
-//     poster URL, rating, rating provider, and age limit.
-//   - An error if the database query fails or if there are issues scanning the results.
-func (psql *Postgres) RetrieveAllMovies() ([]AllMovies, error) {
-	stmt := `SELECT id, title, genre, language, poster_url, rating, rating_provider, age_limit FROM movies`
+func (psql *Postgres) RetrieveAllShowsMovie() ([]AllShowsMovie, error) {
+	stmt := `SELECT s.show_id AS show_id, m.id AS movie_id, m.title AS movie_title, m.genre AS movie_genre, m.language AS movie_language, m.poster_url AS movie_poster_url, m.rating AS movie_rating, m.rating_provider AS movie_rating_provider, m.age_limit AS movie_age_limit FROM show s JOIN movies m ON s.movie_id = m.id`
 
-	// Execute the SQL query to fetch all movies from the database
 	rows, err := psql.DB.Query(stmt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve all movies from the database: %w", err)
@@ -80,12 +69,11 @@ func (psql *Postgres) RetrieveAllMovies() ([]AllMovies, error) {
 
 	defer rows.Close()
 
-	var movies []AllMovies
+	var movies []AllShowsMovie
 
-	// Loop through the rows and scan the values into AllMovies struct
 	for rows.Next() {
-		var movie AllMovies
-		err := rows.Scan(&movie.ID, &movie.Title, &movie.Genre, &movie.Language, &movie.PosterUrl, &movie.Rating, &movie.RatingProvider, &movie.AgeLimit)
+		var movie AllShowsMovie
+		err := rows.Scan(&movie.ShowID,&movie.MovieID,&movie.MovieTitle,&movie.MovieGenre,&movie.MovieLanguage,&movie.MoviePosterUrl,&movie.MovieRating,&movie.MovieRatingProvider,&movie.MovieAgeLimit)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan all movies: %w", err)
 		}

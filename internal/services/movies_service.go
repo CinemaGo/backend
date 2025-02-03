@@ -2,175 +2,546 @@ package services
 
 import (
 	"cinemaGo/backend/internal/models"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type MoviesServiceInterface interface {
 	FetchAllCaruselImages() ([]models.CarouselImage, error)
-	FetchAllMovies() ([]models.AllMovies, error)
-	FetchAMovie(movieID int) (models.Movie, error)
+	FetchAllShowsMovie() ([]models.AllShowsMovie, error)
+	FetchAShowMovie(movieID int) (models.Movie, error)
 	FetchAllActorsCrewsByMovieID(movieID int) ([]models.ActorsCrewsOfMovie, error)
 	FetchActorCrewInfo(actorCrewID int) (models.ActorCrewInfo, error)
 	FetchMoviesByActorCrewID(actorCrewID int) ([]models.ActorCrewMovies, error)
 }
 
 type MoviesService struct {
-	db models.DBContractMovies
+	db          models.DBContractMovies
+	redisClient *redis.Client
 }
 
-func NewMoviesService(db models.DBContractMovies) *MoviesService {
-	return &MoviesService{db: db}
+func NewMoviesService(db models.DBContractMovies) (*MoviesService, error) {
+
+	redisAddr, redisPass, err := LoadRedisEnvironmentVariables("REDIS_ADDR", "REDIS_PASS")
+	if err != nil {
+		return nil, err
+	}
+	rdb := redis.NewClient(&redis.Options{
+		Addr:        redisAddr,
+		Password:    redisPass,
+		DB:          1,
+		DialTimeout: 5 * time.Second,
+	})
+
+	return &MoviesService{
+		db:          db,
+		redisClient: rdb,
+	}, nil
 }
 
-// FetchAllCaruselImages retrieves all carousel images by calling the
-// RetrieveAllCarouselImages method from the database layer.
+// FetchAllCaruselImages fetches carousel images, first checking the Redis cache for existing data.
+// If the data is not found in the cache, it retrieves the data from the database and stores it in the cache.
 //
 // Parameters:
-//   - ms: a pointer to the MoviesService struct, which holds the database connection
-//     and is responsible for handling movie-related logic.
+// - None
 //
 // Returns:
-//   - A slice of models.CarouselImage containing all the carousel images retrieved
-//     from the database.
-//   - An error if something goes wrong during the fetching process, such as a failure
-//     in the database query or scanning the data.
+// - []models.CarouselImage: A slice containing the carousel images.
+// - error: If an error occurs during the fetching process from either Redis or the database.
 func (ms *MoviesService) FetchAllCaruselImages() ([]models.CarouselImage, error) {
-	// Retrieve carousel images using the database method
-	carouselImages, err := ms.db.RetrieveAllCarouselImages()
-	if err != nil {
-		// Return a formatted error if the database retrieval fails
-		return nil, fmt.Errorf("error occurred while fetching all carousel images in the service section: %w", err)
+	carouselImages, err := ms.fetchCachedCarouselImagesDataFromRedis("carouselImages")
+	if errors.Is(err, ErrNoCachedDataFound) {
+		carouselImages, err := ms.db.RetrieveAllCarouselImages()
+		if err != nil {
+			return nil, fmt.Errorf("error occurred while fetching all carousel images in the service section: %w", err)
+		}
+
+		if err := ms.cacheCarouselImagesDataInRedisCache(carouselImages); err != nil {
+			return nil, err
+		}
+
+		return carouselImages, nil
 	}
 
-	// Return the fetched carousel images
+	if err != nil {
+		return nil, err
+	}
+
 	return carouselImages, nil
 }
 
-// FetchAllMovies retrieves all movies from the database and converts the movie ratings
-// from a 0-100 scale to a 0-10 scale.
+// cacheCarouselImagesDataInRedisCache stores carousel images data in Redis cache for future retrieval.
 //
 // Parameters:
-//   - ms: a pointer to the MoviesService struct, which contains the logic for interacting
-//     with the database and transforming data.
+// - carouselImages []models.CarouselImage: The slice of carousel images that will be cached in Redis.
 //
 // Returns:
-// - A slice of models.AllMovies containing all movie data with the adjusted ratings.
-// - An error if there is an issue fetching movies from the database or processing the data.
-func (ms *MoviesService) FetchAllMovies() ([]models.AllMovies, error) {
-	// Retrieve all movies from the database using the db layer
-	movies, err := ms.db.RetrieveAllMovies()
+// - error: Returns an error if any error occurs during the marshalling of the data or setting it in Redis.
+func (ms *MoviesService) cacheCarouselImagesDataInRedisCache(carouselImages []models.CarouselImage) error {
+	jsonData, err := json.Marshal(carouselImages)
 	if err != nil {
-		// Return a formatted error if the movie retrieval fails
-		return nil, fmt.Errorf("error occured while fetching all movies in the service section: %w", err)
+		return fmt.Errorf("error occurred while marshalling carousel images, to cache for Redis: %w", err)
 	}
 
-	// Convert movie ratings from a 0-100 scale to a 0-10 scale.
-	for i := range movies {
-		movies[i].Rating = movies[i].Rating / 10.0
+	err = ms.redisClient.Set(context.Background(), "carouselImages", jsonData, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("error occurred while setting up carouselImages data in Redis: %w", err)
 	}
 
-	// Return the slice of movies with adjusted ratings
-	return movies, nil
+	return nil
 }
 
-// FetchAMovie fetches a movie by its ID from the service layer, converts its rating
-// from a 0-100 scale to a 0-10 scale, and handles errors appropriately.
+// fetchCachedCarouselImagesDataFromRedis fetches carousel images data from Redis cache using the provided key.
 //
 // Parameters:
-// - id: The unique identifier of the movie to be fetched.
+// - keyName string: The key in Redis to retrieve the carousel images data.
 //
 // Returns:
-// - The Movie struct with movie details if found, including the converted rating.
-// - An error if there are issues retrieving the movie or if the movie is not found.
-func (ms *MoviesService) FetchAMovie(movieID int) (models.Movie, error) {
-	// Call the database method to retrieve the movie by its ID
-	movie, err := ms.db.RetrieveAMovie(movieID)
+// - []models.CarouselImage: A slice of carousel images data retrieved from the Redis cache.
+// - error: Returns an error if the data is not found or an issue occurs while retrieving or unmarshalling the data.
+func (ms *MoviesService) fetchCachedCarouselImagesDataFromRedis(keyName string) ([]models.CarouselImage, error) {
+	data, err := ms.redisClient.Get(context.Background(), keyName).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, ErrNoCachedDataFound
+	}
+
 	if err != nil {
-		// If the movie is not found, return a specific error
-		if errors.Is(err, models.ErrMovieNotFoundByID) {
-			return models.Movie{}, ErrMovieNotFoundByID
+		return nil, fmt.Errorf("error occurred while fetching cached carouselImages data from Redis: %w", err)
+	}
+
+	var carouselImagesData []models.CarouselImage
+
+	err = json.Unmarshal([]byte(data), &carouselImagesData)
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while unmarshalling carouselImages data that is coming from Redis cache: %w", err)
+	}
+
+	return carouselImagesData, nil
+}
+
+// FetchAllShowsMovie retrieves all show movies, first checking the Redis cache for existing data.
+// If the data is not found in the cache, it fetches the data from the database, processes it,
+// and stores it in Redis cache for future requests.
+//
+// Parameters:
+// - None
+//
+// Returns:
+// - []models.AllShowsMovie: A slice containing all show movies with their respective ratings.
+// - error: If an error occurs during the fetching process from Redis or the database.
+func (ms *MoviesService) FetchAllShowsMovie() ([]models.AllShowsMovie, error) {
+
+	showsMovie, err := ms.fetchAllShowsMovieDataFromRedisCache("showsMovie")
+	if errors.Is(err, ErrNoCachedDataFound) {
+		showsMovie, err := ms.db.RetrieveAllShowsMovie()
+		if err != nil {
+			return nil, fmt.Errorf("error occurred while fetching all showsMovie in the service section: %w", err)
 		}
 
-		// For other errors, wrap and return a descriptive error
-		return models.Movie{}, fmt.Errorf("error occurred while fetching a movie by id in the service section: %w", err)
+		for i := range showsMovie {
+			showsMovie[i].MovieRating = showsMovie[i].MovieRating / 10
+		}
+
+		if err = ms.cacheAllShowsMovieDataInRedis(showsMovie); err != nil {
+			return nil, err
+		}
+
+		return showsMovie, nil
 	}
 
-	// Convert the movie rating from a 0-100 scale to a 0-10 scale
-	movie.Rating = float32(movie.Rating) / 10.0
+	if err != nil {
+		return nil, err
+	}
 
-	// Return the movie with the adjusted rating
-	return movie, nil
+	return showsMovie, nil
 }
 
-// FetchAllActorsCrewsByMovieID fetches all actors and crew members associated with a movie
-// based on the provided movie ID. It acts as a service layer method that interfaces with
-// the database layer to retrieve the data.
+// cacheAllShowsMovieDataInRedis caches all show movie data in Redis for future use.
 //
 // Parameters:
-// - movieID: The ID of the movie for which actors and crew need to be fetched.
+// - showsMovie []models.AllShowsMovie: The slice of show movies to be cached in Redis.
 //
 // Returns:
-// - A slice of ActorsCrewsOfMovie representing the details of the actors/crew associated with the movie.
-// - An error if there are issues with fetching the data.
-func (ms *MoviesService) FetchAllActorsCrewsByMovieID(movieID int) ([]models.ActorsCrewsOfMovie, error) {
-	// Call the database function to retrieve actors and crew for the given movie ID
-	allActorsCrew, err := ms.db.RetrieveAllActorsCrewsByMovieID(movieID)
+// - error: Returns an error if there is an issue during the marshalling or setting of the data in Redis.
+func (ms *MoviesService) cacheAllShowsMovieDataInRedis(showsMovie []models.AllShowsMovie) error {
+	jsonData, err := json.Marshal(showsMovie)
 	if err != nil {
-		// If there is an error, wrap it with context and return
-		return nil, fmt.Errorf("error occurred while fetching all actors and crews in the service section: %w", err)
+		return fmt.Errorf("error occurred while marshalling showsMovie, to cache for Redis: %w", err)
 	}
 
-	// Return the list of actors/crew if no errors occurred
+	err = ms.redisClient.Set(context.Background(), "showsMovie", jsonData, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("error occurred while setting up showsMovie data in Redis: %w", err)
+	}
+
+	return nil
+}
+
+// fetchAllShowsMovieDataFromRedisCache fetches the show movies data from Redis cache using the provided key.
+//
+// Parameters:
+// - keyName string: The Redis key under which the show movies data is cached.
+//
+// Returns:
+// - []models.AllShowsMovie: A slice of show movie data retrieved from Redis cache.
+// - error: Returns an error if the data is not found in the cache, or if there is an issue retrieving or unmarshalling the data.
+func (ms *MoviesService) fetchAllShowsMovieDataFromRedisCache(keyName string) ([]models.AllShowsMovie, error) {
+	data, err := ms.redisClient.Get(context.Background(), keyName).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, ErrNoCachedDataFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while fetching cached showsMovie data from Redis: %w", err)
+	}
+
+	var showsMovieData []models.AllShowsMovie
+
+	err = json.Unmarshal([]byte(data), &showsMovieData)
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while unmarshalling showsMovie data that is coming from Redis cache: %w", err)
+	}
+
+	return showsMovieData, nil
+}
+
+// FetchAShowMovie retrieves a specific movie by its ID. First, it checks if the data is available in Redis cache.
+// If not found in cache, it fetches the data from the database, processes it, and caches the data in Redis for future requests.
+//
+// Parameters:
+// - movieID int: The ID of the movie to retrieve.
+//
+// Returns:
+// - models.Movie: A Movie object containing the movie details.
+// - error: Returns an error if the movie is not found or if there is an issue fetching the movie from the database or cache.
+func (ms *MoviesService) FetchAShowMovie(movieID int) (models.Movie, error) {
+	aShowMovie, err := ms.fetchAShowMovieDataFromRedisCache("aShowMovie")
+	if errors.Is(err, ErrNoCachedDataFound) {
+		aShowMovie, err := ms.db.RetrieveAMovie(movieID)
+		if err != nil {
+			if errors.Is(err, models.ErrMovieNotFoundByID) {
+				return models.Movie{}, ErrMovieNotFoundByID
+			}
+
+			return models.Movie{}, fmt.Errorf("error occurred while fetching a aShowMovie by id in the service section: %w", err)
+		}
+
+		aShowMovie.Rating = float32(aShowMovie.Rating) / 10.0
+
+		if err := ms.cacheAShowMovieDataInRedis(aShowMovie); err != nil {
+			return models.Movie{}, err
+		}
+
+		return aShowMovie, nil
+	}
+
+	if err != nil {
+		return models.Movie{}, nil
+	}
+
+	return aShowMovie, nil
+}
+
+// cacheAShowMovieDataInRedis caches a single movie data in Redis for future use.
+//
+// Parameters:
+// - aShowMovie models.Movie: The movie data to be cached in Redis.
+//
+// Returns:
+// - error: Returns an error if there is an issue during the marshalling or setting of the data in Redis.
+func (ms *MoviesService) cacheAShowMovieDataInRedis(aShowMovie models.Movie) error {
+	jsonData, err := json.Marshal(aShowMovie)
+	if err != nil {
+		return fmt.Errorf("error occurred while marshalling aShowMovie, to cache for Redis: %w", err)
+	}
+
+	err = ms.redisClient.Set(context.Background(), "aShowMovie", jsonData, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("error occurred while setting up aShowMovie data in Redis: %w", err)
+	}
+
+	return nil
+}
+
+// fetchAShowMovieDataFromRedisCache fetches the movie data from Redis cache using the provided key.
+//
+// Parameters:
+// - keyName string: The Redis key under which the movie data is cached.
+//
+// Returns:
+// - models.Movie: The movie data retrieved from Redis cache.
+// - error: Returns an error if the data is not found in the cache, or if there is an issue retrieving or unmarshalling the data.
+func (ms *MoviesService) fetchAShowMovieDataFromRedisCache(keyName string) (models.Movie, error) {
+	data, err := ms.redisClient.Get(context.Background(), keyName).Result()
+	if errors.Is(err, redis.Nil) {
+		return models.Movie{}, ErrNoCachedDataFound
+	}
+
+	if err != nil {
+		return models.Movie{}, fmt.Errorf("error occurred while fetching cached aShowMovie data from Redis: %w", err)
+	}
+
+	var aShowMovie models.Movie
+
+	err = json.Unmarshal([]byte(data), &aShowMovie)
+	if err != nil {
+		return models.Movie{}, fmt.Errorf("error occurred while unmarshalling aShowMovie data that is coming from Redis cache: %w", err)
+	}
+
+	return aShowMovie, nil
+}
+
+// FetchAllActorsCrewsByMovieID retrieves a list of actors and crew for a specific movie by its ID.
+// It first attempts to fetch the data from Redis cache, and if not found, retrieves the data from the database
+// and caches it in Redis for future use.
+//
+// Parameters:
+// - movieID int: The ID of the movie for which to fetch the actors and crew.
+//
+// Returns:
+// - []models.ActorsCrewsOfMovie: A list of actors and crew associated with the specified movie.
+// - error: Returns an error if the data cannot be fetched from the cache or database, or if there is an issue with caching.
+func (ms *MoviesService) FetchAllActorsCrewsByMovieID(movieID int) ([]models.ActorsCrewsOfMovie, error) {
+	allActorsCrew, err := ms.fetchAllActorsCrewsByMovieIDFromRedisCache("allActorsCrew")
+	if errors.Is(err, ErrNoCachedDataFound) {
+		allActorsCrew, err := ms.db.RetrieveAllActorsCrewsByMovieID(movieID)
+		if err != nil {
+			return nil, fmt.Errorf("error occurred while fetching all actors and crews in the service section: %w", err)
+		}
+
+		if err := ms.cacheAllActorsCrewsByMovieIDInRedis(allActorsCrew); err != nil {
+			return nil, err
+		}
+
+		return allActorsCrew, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
 	return allActorsCrew, nil
 }
 
-// FetchActorCrewInfo retrieves the detailed information of an actor or crew member by their ID.
-// It calls the database function RetriveActorCrewInfo and handles specific errors gracefully.
+// cacheAllActorsCrewsByMovieIDInRedis caches a list of actors and crew data for a specific movie in Redis.
 //
 // Parameters:
-// - actorCrewID (int): The ID of the actor or crew member whose details are being fetched.
+// - allActorsCrew []models.ActorsCrewsOfMovie: The list of actors and crew data to be cached.
 //
 // Returns:
-// - models.ActorCrewInfo: The detailed information of the actor/crew member if found.
-// - error: Returns nil if the retrieval was successful, or an error if any occurred during the process.
-func (ms *MoviesService) FetchActorCrewInfo(actorCrewID int) (models.ActorCrewInfo, error) {
-	// Fetch actor/crew info from the database
-	actorCrewInfo, err := ms.db.RetriveActorCrewInfo(actorCrewID)
+// - error: Returns an error if there is an issue during the marshalling or setting of the data in Redis.
+func (ms *MoviesService) cacheAllActorsCrewsByMovieIDInRedis(allActorsCrew []models.ActorsCrewsOfMovie) error {
+	jsonData, err := json.Marshal(allActorsCrew)
 	if err != nil {
-		// Handle specific error when the actor/crew member is not found by ID
-		if errors.Is(err, models.ErrActorCrewNotFoundByID) {
-			return models.ActorCrewInfo{}, ErrActorCrewNotFoundByID
-		}
-		// Wrap and return any other errors
-		return models.ActorCrewInfo{}, fmt.Errorf("error occurred while fetching actor or crew info in the service section: %w", err)
+		return fmt.Errorf("error occurred while marshalling allActorsCrew, to cache for Redis: %w", err)
 	}
 
-	// Return the fetched actor/crew information
+	err = ms.redisClient.Set(context.Background(), "allActorsCrew", jsonData, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("error occurred while setting up allActorsCrew data in Redis: %w", err)
+	}
+
+	return nil
+}
+
+// fetchAllActorsCrewsByMovieIDFromRedisCache retrieves the list of actors and crew data from Redis cache
+// for a specific movie using the provided cache key.
+//
+// Parameters:
+// - keyName string: The Redis key under which the actors and crew data is cached.
+//
+// Returns:
+// - []models.ActorsCrewsOfMovie: A list of actors and crew for the movie.
+// - error: Returns an error if the data is not found in the cache, or if there is an issue retrieving or unmarshalling the data.
+func (ms *MoviesService) fetchAllActorsCrewsByMovieIDFromRedisCache(keyName string) ([]models.ActorsCrewsOfMovie, error) {
+	data, err := ms.redisClient.Get(context.Background(), keyName).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, ErrNoCachedDataFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while fetching cached allActorsCrew data from Redis: %w", err)
+	}
+
+	var allActorsCrew []models.ActorsCrewsOfMovie
+
+	err = json.Unmarshal([]byte(data), &allActorsCrew)
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while unmarshalling allActorsCrew data that is coming from Redis cache: %w", err)
+	}
+
+	return allActorsCrew, nil
+}
+
+// FetchActorCrewInfo retrieves detailed information about a specific actor or crew member by their ID.
+// It first tries to fetch the data from Redis cache, and if not found, fetches the data from the database
+// and caches it for future use.
+//
+// Parameters:
+// - actorCrewID int: The ID of the actor or crew member whose information is being fetched.
+//
+// Returns:
+// - models.ActorCrewInfo: The detailed information about the actor or crew member.
+// - error: Returns an error if the data cannot be fetched from the cache or database, or if there is an issue with caching.
+func (ms *MoviesService) FetchActorCrewInfo(actorCrewID int) (models.ActorCrewInfo, error) {
+	actorCrewInfo, err := ms.fetchActorCrewInfoFromRedisCache("actorCrewInfo")
+	if errors.Is(err, ErrNoCachedDataFound) {
+		actorCrewInfo, err := ms.db.RetriveActorCrewInfo(actorCrewID)
+		if err != nil {
+			if errors.Is(err, models.ErrActorCrewNotFoundByID) {
+				return models.ActorCrewInfo{}, ErrActorCrewNotFoundByID
+			}
+			return models.ActorCrewInfo{}, fmt.Errorf("error occurred while fetching actor or crew info in the service section: %w", err)
+		}
+
+		if err := ms.cacheActorCrewInfoIDInRedis(actorCrewInfo); err != nil {
+			return models.ActorCrewInfo{}, err
+		}
+
+		return actorCrewInfo, nil
+	}
+
+	if err != nil {
+		return models.ActorCrewInfo{}, err
+	}
+
 	return actorCrewInfo, nil
 }
 
-// FetchMoviesByActorCrewID retrieves all movies associated with a specific actor or crew member,
-// based on the provided actorCrewID.
+// cacheActorCrewInfoIDInRedis caches the actor or crew information in Redis for a specified period of time.
 //
 // Parameters:
-// - actorCrewID (int): The ID of the actor or crew member whose associated movies are being fetched.
+// - ActorCrewInfo models.ActorCrewInfo: The actor or crew member's information to cache.
 //
 // Returns:
-// - []models.ActorCrewMovies: A slice of ActorCrewMovies structs containing movie details for the given actor or crew member.
-// - error: Returns nil if the retrieval was successful, or an error if any occurred during the process.
-func (ms *MoviesService) FetchMoviesByActorCrewID(actorCrewID int) ([]models.ActorCrewMovies, error) {
-	// Call the database function to retrieve the list of movies by actor/crew ID
-	actorCrewMovies, err := ms.db.RetrieveMoviesByActorCrewID(actorCrewID)
+// - error: Returns an error if there is an issue during the marshalling or setting of the data in Redis.
+func (ms *MoviesService) cacheActorCrewInfoIDInRedis(ActorCrewInfo models.ActorCrewInfo) error {
+	jsonData, err := json.Marshal(ActorCrewInfo)
 	if err != nil {
-		// If the actor/crew is not found, return the specific error
-		if errors.Is(err, models.ErrActorCrewNotFoundByID) {
-			return nil, ErrActorCrewNotFoundByID
-		}
-		// Wrap any other errors with additional context
-		return nil, fmt.Errorf("error occurred while fetching all movies of actors or crews in the service section: %v", err)
+		return fmt.Errorf("error occurred while marshalling ActorCrewInfo, to cache for Redis: %w", err)
 	}
 
-	// Return the fetched list of actor/crew movies
+	err = ms.redisClient.Set(context.Background(), "ActorCrewInfo", jsonData, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("error occurred while setting up ActorCrewInfo data in Redis: %w", err)
+	}
+
+	return nil
+}
+
+// fetchActorCrewInfoFromRedisCache retrieves the actor or crew information from Redis cache using the provided key.
+//
+// Parameters:
+// - keyName string: The Redis key under which the actor or crew member's information is cached.
+//
+// Returns:
+// - models.ActorCrewInfo: The detailed information about the actor or crew member.
+// - error: Returns an error if the data is not found in the cache, or if there is an issue retrieving or unmarshalling the data.
+func (ms *MoviesService) fetchActorCrewInfoFromRedisCache(keyName string) (models.ActorCrewInfo, error) {
+	data, err := ms.redisClient.Get(context.Background(), keyName).Result()
+	if errors.Is(err, redis.Nil) {
+		return models.ActorCrewInfo{}, ErrNoCachedDataFound
+	}
+
+	if err != nil {
+		return models.ActorCrewInfo{}, fmt.Errorf("error occurred while fetching cached ActorCrewInfo data from Redis: %w", err)
+	}
+	var ActorCrewInfo models.ActorCrewInfo
+
+	err = json.Unmarshal([]byte(data), &ActorCrewInfo)
+	if err != nil {
+		return models.ActorCrewInfo{}, fmt.Errorf("error occurred while unmarshalling ActorCrewInfo data that is coming from Redis cache: %w", err)
+	}
+
+	return ActorCrewInfo, nil
+}
+
+// FetchMoviesByActorCrewID retrieves a list of movies associated with a specific actor or crew member
+// using their actor/crew ID. It first attempts to fetch the data from the Redis cache, and if not found,
+// retrieves it from the database and caches the result for future use.
+//
+// Parameters:
+// - actorCrewID int: The ID of the actor or crew member whose movies are being fetched.
+//
+// Returns:
+// - []models.ActorCrewMovies: A list of movies associated with the actor or crew member.
+// - error: Returns an error if the data cannot be fetched from the cache or database, or if there is an issue with caching.
+func (ms *MoviesService) FetchMoviesByActorCrewID(actorCrewID int) ([]models.ActorCrewMovies, error) {
+	actorCrewMovies, err := ms.fetchMoviesByActorCrewIDFromRedisCache("actorCrewMovies")
+	if errors.Is(err, ErrNoCachedDataFound) {
+		actorCrewMovies, err := ms.db.RetrieveMoviesByActorCrewID(actorCrewID)
+		if err != nil {
+			if errors.Is(err, models.ErrActorCrewNotFoundByID) {
+				return nil, ErrActorCrewNotFoundByID
+			}
+			return nil, fmt.Errorf("error occurred while fetching all movies of actors or crews in the service section: %w", err)
+		}
+
+		if err := ms.cacheMoviesByActorCrewIDInRedis(actorCrewMovies); err != nil {
+			return nil, err
+		}
+
+		return actorCrewMovies, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return actorCrewMovies, nil
+}
+
+// cacheMoviesByActorCrewIDInRedis caches the list of movies associated with a specific actor or crew
+// in Redis for a specified period of time.
+//
+// Parameters:
+// - actorCrewMovies []models.ActorCrewMovies: A list of movies associated with the actor or crew to cache.
+//
+// Returns:
+// - error: Returns an error if there is an issue during the marshalling or setting of the data in Redis.
+func (ms *MoviesService) cacheMoviesByActorCrewIDInRedis(actorCrewMovies []models.ActorCrewMovies) error {
+	jsonData, err := json.Marshal(actorCrewMovies)
+	if err != nil {
+		return fmt.Errorf("error occurred while marshalling actorCrewMovies, to cache for Redis: %w", err)
+	}
+
+	err = ms.redisClient.Set(context.Background(), "actorCrewMovies", jsonData, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("error occurred while setting up actorCrewMovies data in Redis: %w", err)
+	}
+
+	return nil
+}
+
+// fetchMoviesByActorCrewIDFromRedisCache retrieves the list of movies associated with a specific actor
+// or crew member from Redis cache using the provided key.
+//
+// Parameters:
+// - keyName string: The Redis key under which the actor or crew member's movies are cached.
+//
+// Returns:
+// - []models.ActorCrewMovies: A list of movies associated with the actor or crew member.
+// - error: Returns an error if the data is not found in the cache, or if there is an issue retrieving or unmarshalling the data.
+func (ms *MoviesService) fetchMoviesByActorCrewIDFromRedisCache(keyName string) ([]models.ActorCrewMovies, error) {
+	data, err := ms.redisClient.Get(context.Background(), keyName).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, ErrNoCachedDataFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while fetching cached actorCrewMovies data from Redis: %w", err)
+	}
+	var actorCrewMovies []models.ActorCrewMovies
+
+	err = json.Unmarshal([]byte(data), &actorCrewMovies)
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while unmarshalling actorCrewMovies data that is coming from Redis cache: %w", err)
+	}
+
 	return actorCrewMovies, nil
 }

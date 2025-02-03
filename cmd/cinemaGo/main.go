@@ -63,13 +63,16 @@ func main() {
 	// Ensure the database connection is closed when the program exits.
 	defer db.Close()
 
-	moviesService := services.NewMoviesService(db)
+	moviesService, err := services.NewMoviesService(db)
+	if err != nil {
+		log.Fatal(err)
+	}
 	moviesHandler := handlers.NewMoviesHandler(moviesService)
 
 	serveHandlersWrapper := routes.ServeHandlersWrapper{
 		MoviesHandler: moviesHandler,
 	}
-	
+
 	router := routes.Router(&serveHandlersWrapper)
 
 	router.Run()
