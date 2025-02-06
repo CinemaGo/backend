@@ -155,3 +155,12 @@ func ValidatePassword(password, confirmPassword string) error {
 	// Return nil if the password is valid
 	return nil
 }
+
+func ValidateSeatsID(seatsID []int)error{
+	for _,k := range seatsID{
+		if k <=0{
+			return fmt.Errorf("invalid seat ID")
+		}
+	}
+	return nil
+}

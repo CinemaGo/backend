@@ -63,3 +63,39 @@ type UserInfo struct {
 	Email       string
 	PhoneNumber string
 }
+
+type ShowMovieInfo struct {
+	MovieID       int
+	MovieTitle    string
+	MovieGenre    string
+	MovieAgeLimit string
+	MovieLanguage string
+}
+
+type ShowInfo struct {
+	HallName       string
+	HallType       string
+	ShowDate       string
+	ShowStartTimes []ShowStartTime
+}
+
+type ShowStartTime struct {
+	ShowID    int
+	StartTime string
+}
+
+type ShowSeat struct {
+	ShowSeatID int
+	SeatRow    string
+	SeatNumber int
+	SeatType   string
+	SeatStatus string
+	SeatPrice  int
+}
+
+type ShowSeatsMovieInfo struct {
+	MovieTitle    string
+	ShowID        int
+	ShowDate      string
+	ShowStartTime string
+}

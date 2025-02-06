@@ -14,7 +14,12 @@ type userLoginForm struct {
 }
 
 type userInfoUpdateFrom struct {
-	Name    string `json:"name" binding:"required"`    
-	Surname    string `json:"surname" binding:"required"`    
-	PhoneNumber string `json:"phone_number" binding:"required"` 
+	Name        string `json:"name" binding:"required"`
+	Surname     string `json:"surname" binding:"required"`
+	PhoneNumber string `json:"phone_number" binding:"required"`
+}
+
+type BookingForm struct {
+	ShowID      int   `json:"show_id" binding:"required"`
+	ShowSeatsID []int `json:"show_seats_id" binding:"required"`
 }

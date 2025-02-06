@@ -38,10 +38,10 @@ func NewUsers(db DBContractUsers) *Users {
 // - ErrDuplicatedEmail if the email already exists in the database.
 // - error if a database issue occurs.
 func (psql *Postgres) InsertNewUser(name, surname, email, phoneNumber string, password_hash []byte) error {
-	queryStr := `INSERT INTO users (name, surname, email, phone_number, password_hash) VALUES ($1, $2, $3, $4, $5)`
+	stmt := `INSERT INTO users (name, surname, email, phone_number, password_hash) VALUES ($1, $2, $3, $4, $5)`
 
 	// Execute the query, passing the parameters to the query placeholders.
-	_, err := psql.DB.Exec(queryStr, name, surname, email, phoneNumber, password_hash)
+	_, err := psql.DB.Exec(stmt, name, surname, email, phoneNumber, password_hash)
 	if err != nil {
 		// Check if the error is related to a duplicate email (PostgreSQL constraint violation).
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
@@ -66,13 +66,13 @@ func (psql *Postgres) InsertNewUser(name, surname, email, phoneNumber string, pa
 // - userRole: The user's role (e.g., admin, user).
 // - error if a database issue occurs or the user is not found.
 func (psql *Postgres) RetrieveUserCredentials(email string) (int, string, string, error) {
-	queryStr := `SELECT id, password_hash, role FROM users WHERE email = $1`
+	stmt := `SELECT id, password_hash, role FROM users WHERE email = $1`
 	var userID int
 	var password_hash string
 	var userRole string
 
 	// Execute the query and scan the results into the respective variables.
-	err := psql.DB.QueryRow(queryStr, email).Scan(&userID, &password_hash, &userRole)
+	err := psql.DB.QueryRow(stmt, email).Scan(&userID, &password_hash, &userRole)
 	if err != nil {
 		// If no user is found, return the custom error ErrUserNotFound.
 		if errors.Is(err, sql.ErrNoRows) {
@@ -95,12 +95,12 @@ func (psql *Postgres) RetrieveUserCredentials(email string) (int, string, string
 // - user: A UserInfo struct containing the user's name, surname, email, and phone number.
 // - error if a database issue occurs or the user is not found.
 func (psql *Postgres) RetrieveUserInfo(userID int) (UserInfo, error) {
-	queryStr := `SELECT name, surname, email, phone_number FROM users WHERE id = $1`
+	stmt := `SELECT name, surname, email, phone_number FROM users WHERE id = $1`
 
 	var user UserInfo
 
 	// Execute the query and scan the results into the 'user' struct.
-	err := psql.DB.QueryRow(queryStr, userID).Scan(&user.Name, &user.Surname, &user.Email, &user.PhoneNumber)
+	err := psql.DB.QueryRow(stmt, userID).Scan(&user.Name, &user.Surname, &user.Email, &user.PhoneNumber)
 	if err != nil {
 
 		// If no user is found, return the custom error ErrUserNotFound.
@@ -128,10 +128,10 @@ func (psql *Postgres) RetrieveUserInfo(userID int) (UserInfo, error) {
 // - nil if the user information is updated successfully.
 // - error if a database issue occurs during the update.
 func (psql *Postgres) UpdateUserInformationByID(userID int, name, surname, phoneNumber string) error {
-	queryStr := `UPDATE users SET name = $1, surname = $2, phone_number = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`
+	stmt := `UPDATE users SET name = $1, surname = $2, phone_number = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`
 
 	// Execute the query to update the user information.
-	_, err := psql.DB.Exec(queryStr, name, surname, phoneNumber, userID)
+	_, err := psql.DB.Exec(stmt, name, surname, phoneNumber, userID)
 	if err != nil {
 		// Return a generic error with the original database error wrapped.
 		return fmt.Errorf("failed to update user information: %w", err)

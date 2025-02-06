@@ -75,9 +75,13 @@ func main() {
 	}
 	usersHandler := handlers.NewUsersHandler(usersService)
 
+	bookingService := services.NewBookingService(db)
+	bookingHandler := handlers.NewBookingHandler(bookingService)
+
 	serveHandlersWrapper := routes.ServeHandlersWrapper{
-		MoviesHandler: moviesHandler,
-		UsersHandler:  usersHandler,
+		MoviesHandler:  moviesHandler,
+		UsersHandler:   usersHandler,
+		BookingHandler: bookingHandler,
 	}
 
 	router := routes.Router(&serveHandlersWrapper)

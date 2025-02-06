@@ -10,6 +10,7 @@ import (
 type ServeHandlersWrapper struct {
 	*handlers.MoviesHandler
 	*handlers.UsersHandler
+	*handlers.BookingHandler
 }
 
 func Router(h *ServeHandlersWrapper) *gin.Engine {
@@ -29,6 +30,11 @@ func Router(h *ServeHandlersWrapper) *gin.Engine {
 		v1.GET("/my-profile/edit", middlewares.UserAuthorizationJWT(), h.UserProfile)
 		v1.PUT("/my-profile/edit", middlewares.UserAuthorizationJWT(), h.UpdateUserProfile)
 		v1.POST("/my-profile/logout", middlewares.UserAuthorizationJWT(), h.Logout)
+
+		v1.GET("/buytickets/movie/:showID/show-times", h.MovieShowTimes)
+		v1.GET("/buytickets/movie/:showID/available-seats", h.ShowSeats)
+
+		v1.POST("/buytickets/payment", middlewares.UserAuthorizationJWT(), h.BookSeats)
 	}
 
 	return router
