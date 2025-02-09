@@ -4,6 +4,7 @@ import (
 	"cinemaGo/backend/api/helpers"
 	"cinemaGo/backend/pkg/configs"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -84,5 +85,21 @@ func UserAuthorizationJWT() gin.HandlerFunc {
 
 		// Proceed to the next middleware or handler in the chain
 		c.Next()
+	}
+}
+
+// AdminRoleRequired checks if the user is an admin. If not, it responds with a 403 status code.
+func AdminRoleRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("userRole")
+
+		if !exists || role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{
+				"message": "Access forbidden: Admins only",
+			})
+			c.Abort() // Stop further processing
+			return
+		}
+		c.Next() // Continue to the next handler if the user is an admin
 	}
 }

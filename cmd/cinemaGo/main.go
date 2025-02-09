@@ -78,10 +78,14 @@ func main() {
 	bookingService := services.NewBookingService(db)
 	bookingHandler := handlers.NewBookingHandler(bookingService)
 
+	adminService := services.NewAdminService(db)
+	adminHandler := handlers.NewAdminHandler(adminService)
+
 	serveHandlersWrapper := routes.ServeHandlersWrapper{
 		MoviesHandler:  moviesHandler,
 		UsersHandler:   usersHandler,
 		BookingHandler: bookingHandler,
+		AdminHandler:   adminHandler,
 	}
 
 	router := routes.Router(&serveHandlersWrapper)

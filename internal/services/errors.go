@@ -16,3 +16,10 @@ var ErrShowSeatNotFound = errors.New("models: show seat not found")
 
 var ErrShowSeatHasSelected = errors.New("show seat has just selected or booked")
 var ErrTooManySeats = errors.New("too many seats selected")
+
+var ErrAdminPageCarouselImagesNotFound = errors.New("models: Admin Page Carousel Images Not Found")
+var ErrAdminPageMovieNotFound = errors.New("models: Admin Page Movie Not Found")
+var ErrActorCrewNotFound = errors.New("models: Admin page actorCrew with ID not found")
+var ErrCinemaHallNotFound = errors.New("models: Admin page cinema hall not found")
+var ErrCinemaSeatNotFound = errors.New("models: Admin page cinema seat not found")
+var ErrCinemaSeatAlreadyExists = errors.New("cinema seat with hall_id, seat_row, seat_number already exists")

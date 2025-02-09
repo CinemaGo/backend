@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type CarouselImage struct {
 	ID       int
 	ImageURL string
@@ -98,4 +100,88 @@ type ShowSeatsMovieInfo struct {
 	ShowID        int
 	ShowDate      string
 	ShowStartTime string
+}
+
+type CarouselImageForAdmin struct {
+	CarouselImageID int
+	ImageURL        string
+	Title           string
+	Description     string
+	OrderPriority   int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type AllMoviesForAdmin struct {
+	ID    int
+	Title string
+}
+
+type MovieForAdmin struct {
+	MovieID        int
+	Title          string
+	Description    string
+	Genere         string
+	Language       string
+	TrailerURL     string
+	PosterURL      string
+	Rating         float32
+	RatingProvider string
+	Duration       int
+	RelaseDate     string
+	AgeLimit       string
+	CreatedAt      time.Time
+	UpdatesAt      time.Time
+}
+
+type AllActorCrewForAdmin struct {
+	ActorCrewID     int
+	FullName        string
+	ImageURL        string
+	RoleDescription string
+	IsActor         bool
+}
+
+type ActorCrewForAdmin struct {
+	ActorCrewID     int
+	FullName        string
+	ImageURL        string
+	Occupation      string
+	RoleDescription string
+	BornDate        string
+	Birthplace      string
+	About           string
+	IsActor         bool
+}
+
+type CinemaHallForAdmin struct {
+	CinemaHallID int
+	HallName     string
+	HallType     string
+	Capacity     int
+}
+
+type CinemaSeatForAdmin struct {
+	CinemaSeatID int
+	SeatRow      *string
+	SeatNumber   int
+	SeatType     string
+	HallID       int
+}
+
+type ShowForAdmin struct {
+	ShowID    int
+	ShowDate  string
+	StartTime string
+	HallID    int
+	MovieID   int
+}
+
+type ShowSeatForAdmin struct {
+	ShowSeatID   int
+	CinemaSeatID int
+	SeatStatus   string
+	SeatPrice    int
+	ShowID       int
+	BookingID    int
 }
