@@ -58,13 +58,18 @@ func Router(h *ServeHandlersWrapper) *gin.Engine {
 		v1.GET("/admin/cinema-hall/:cinemaHallID", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.CinemaHallAdmin)
 		v1.PUT("/admin/cinema-hall/edit", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.EditCinemaHallAdmin)
 		v1.DELETE("/admin/cinema-hall/delete", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.DeleteCinemaHallAdmin)
-		
+
 		v1.POST("/admin/cinema-hall-seat/new", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.NewCinemaHallSeatAdmin)
 		v1.DELETE("/admin/cinema-hall-seat/delete", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.DeleteCinemaHallSeatAdmin)
 
 		v1.GET("/admin/show/all", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.AllShowsAdmin)
 		v1.POST("/admin/show/new", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.NewShowAdmin)
-		
+		v1.PUT("/admin/show/edit", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.EditShowAdmin)
+		v1.DELETE("/admin/show/delete", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.DeleteShowAdmin)
+
+		v1.GET("/admin/show-seats/:showID", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.AllShowSeatsAdmin)
+		v1.PUT("/admin/show-seat-price/edit", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.EditShowSeatPriceAdmin)
+
 	}
 
 	return router

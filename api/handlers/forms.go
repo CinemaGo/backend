@@ -140,3 +140,20 @@ type NewShowForm struct {
 	HallID    int       `json:"hall_id" binding:"required"`
 	MovieID   int       `json:"movie_id" binding:"required"`
 }
+
+type EditShowForm struct {
+	ShowID    int       `json:"show_id" binding:"required"`
+	ShowDate  time.Time `json:"show_date" binding:"required"`
+	StartTime time.Time `json:"start_time" binding:"required"`
+	HallID    int       `json:"hall_id" binding:"required"`
+	MovieID   int       `json:"movie_id" binding:"required"`
+}
+
+type DeleteShowForm struct {
+	ShowID int `json:"show_id" binding:"required"`
+}
+
+type EditShowSeatForm struct {
+	SeatPrice  float32 `json:"seat_price" binding:"required"`
+	ShowSeatID int     `json:"show_seat_id" binding:"required"`
+}

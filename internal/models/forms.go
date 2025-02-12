@@ -183,5 +183,4 @@ type ShowSeatForAdmin struct {
 	SeatStatus   string
 	SeatPrice    int
 	ShowID       int
-	BookingID    int
 }

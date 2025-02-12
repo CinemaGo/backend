@@ -38,14 +38,14 @@ type DBContractAdminCtrl interface {
 	RetrieveALLCinemaSeatsByHallID(hallID int) ([]CinemaSeatForAdmin, error)
 	DeleteCinemaSeatByID(cinemaSeatID int) error
 
-	InsertNewShow(showDate string, startTime string, hallID int, movieID int) error
+	InsertNewShow(showDate string, startTime string, hallID int, movieID int) (int, error)
 	RetrieveAllShowsForAdmin() ([]ShowForAdmin, error)
 	UpdateShowByID(showID int, showDate string, startTime string, hallID int, movieID int) error
 	DeleteShowByID(showID int) error
 
 	InsertNewShowSeat(seatStatus string, seatPrice int, cinemSeatID int, showID int) error
-	RetrieveAllShowSeats() ([]ShowSeatForAdmin, error)
-	DeleteNewShowSeat(cinemaSeatID int) error
+	RetrieveAllShowSeats(showID int) ([]ShowSeatForAdmin, error)
+	UpdateShowSeatByID(seatPrice int, showSeatID int) error
 }
 
 type AdminOperations struct {
@@ -519,24 +519,26 @@ func (psql *Postgres) DeleteCinemaSeatByID(cinemaSeatID int) error {
 	return nil
 }
 
-func (psql *Postgres) InsertNewShow(showDate string, startTime string, hallID int, movieID int) error {
-	stmt := `INSERT INTO show (show_date, start_time, hall_id, movie_id) VALUES ($1, $2, $3, $4)`
+func (psql *Postgres) InsertNewShow(showDate string, startTime string, hallID int, movieID int) (int, error) {
+	stmt := `INSERT INTO show (show_date, start_time, hall_id, movie_id) VALUES ($1, $2, $3, $4) RETURNING show_id`
 
-	_, err := psql.DB.Exec(stmt, showDate, startTime, hallID, movieID)
+	var showID int
+
+	err := psql.DB.QueryRow(stmt, showDate, startTime, hallID, movieID).Scan(&showID)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23503" {
 			if pqErr.Detail != "" {
 				if pqErr.Detail == "Key (hall_id)=(<hall_id>) is not present in table \"hall\"" {
-					return ErrCinemaHallNotFound
+					return 0, ErrCinemaHallNotFound
 				} else if pqErr.Detail == "Key (movie_id)=(<movie_id>) is not present in table \"movie\"" {
-					return ErrMovieNotFoundByID
+					return 0, ErrMovieNotFoundByID
 				}
 			}
 		}
-		return fmt.Errorf("failed to insert new show: %w", err)
+		return 0, fmt.Errorf("failed to insert new show: %w", err)
 	}
 
-	return nil
+	return showID, nil
 }
 
 func (psql *Postgres) RetrieveAllShowsForAdmin() ([]ShowForAdmin, error) {
@@ -598,7 +600,7 @@ func (psql *Postgres) UpdateShowByID(showID int, showDate string, startTime stri
 }
 
 func (psql *Postgres) DeleteShowByID(showID int) error {
-	stmt := `DELETE FROM show WHERE show_seat_id = $1`
+	stmt := `DELETE FROM show WHERE show_id = $1`
 
 	result, err := psql.DB.Exec(stmt, showID)
 	if err != nil {
@@ -613,7 +615,7 @@ func (psql *Postgres) DeleteShowByID(showID int) error {
 		return ErrShowNotFound
 		// fmt.Errorf("show_id %d is invalid: %w", showID, ErrShowIDNotFound)
 	}
-	
+
 	return nil
 }
 
@@ -627,10 +629,10 @@ func (psql *Postgres) InsertNewShowSeat(seatStatus string, seatPrice int, cinemS
 	return nil
 }
 
-func (psql *Postgres) RetrieveAllShowSeats() ([]ShowSeatForAdmin, error) {
-	stmt := `SELECT * FROM show_seat`
+func (psql *Postgres) RetrieveAllShowSeats(showID int) ([]ShowSeatForAdmin, error) {
+	stmt := `SELECT show_seat_id, cinema_seat_id, status, price, show_id FROM show_seat WHERE show_id = $1`
 
-	rows, err := psql.DB.Query(stmt)
+	rows, err := psql.DB.Query(stmt, showID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve all show seats for admin page: %w", err)
 	}
@@ -642,7 +644,7 @@ func (psql *Postgres) RetrieveAllShowSeats() ([]ShowSeatForAdmin, error) {
 	for rows.Next() {
 		var showSeat ShowSeatForAdmin
 
-		err := rows.Scan(&showSeat.ShowSeatID, &showSeat.CinemaSeatID, &showSeat.SeatStatus, &showSeat.SeatPrice, &showSeat.ShowID, &showSeat.BookingID)
+		err := rows.Scan(&showSeat.ShowSeatID, &showSeat.CinemaSeatID, &showSeat.SeatStatus, &showSeat.SeatPrice, &showSeat.ShowID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, ErrShowSeatNotFound
@@ -656,12 +658,22 @@ func (psql *Postgres) RetrieveAllShowSeats() ([]ShowSeatForAdmin, error) {
 	return allShowSeats, nil
 }
 
-func (psql *Postgres) DeleteNewShowSeat(cinemaSeatID int) error {
-	stmt := `DELETE FROM show_seat WHERE cinema_seat_id = $1`
+func (psql *Postgres) UpdateShowSeatByID(seatPrice int, showSeatID int) error {
+	stmt := `UPDATE show_seat SET price = $1 WHERE show_seat_id = $2`
 
-	_, err := psql.DB.Exec(stmt, cinemaSeatID)
+	result, err := psql.DB.Exec(stmt, seatPrice, showSeatID)
 	if err != nil {
-		return fmt.Errorf("failed to delete show seat: %w", err)
+		return fmt.Errorf("error occurred while updating seat price: %w", err)
 	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error occurred while checking affected rows: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrShowSeatNotFound
+	}
+
 	return nil
 }

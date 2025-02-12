@@ -39,6 +39,9 @@ type AdminServiceInterface interface {
 	FetchAllShowsForAdmin() ([]models.ShowForAdmin, error)
 	UpdateShow(showID int, showDate, startTime time.Time, hallID int, movieID int) error
 	DeleteShow(showID int) error
+
+	FetchAllShowSeats(showID int) ([]models.ShowSeatForAdmin, error)
+	UpdateShowSeat(seatPrice float32, showSeatID int) error
 }
 
 type AdminService struct {
@@ -329,9 +332,9 @@ func (as *AdminService) DeleteCinemaSeat(cinemaSeatID int) error {
 func (as *AdminService) AddNewShow(showDate, startTime time.Time, hallID int, movieID int) error {
 
 	formattedDate := showDate.Format("2006-01-02")
-	formattedTime := startTime.Format("14:00")
+	formattedTime := startTime.Format("15:04:05")
 
-	err := as.db.InsertNewShow(formattedDate, formattedTime, hallID, movieID)
+	showID, err := as.db.InsertNewShow(formattedDate, formattedTime, hallID, movieID)
 	if err != nil {
 		if errors.Is(err, models.ErrCinemaHallNotFound) {
 			return ErrCinemaHallNotFound
@@ -341,6 +344,24 @@ func (as *AdminService) AddNewShow(showDate, startTime time.Time, hallID int, mo
 		}
 
 		return fmt.Errorf("error occured while addning new show: %w", err)
+	}
+
+	allCinemaSeats, err := as.db.RetrieveALLCinemaSeatsByHallID(hallID)
+	if err != nil {
+		if errors.Is(err, models.ErrCinemaSeatNotFound) {
+			return ErrCinemaSeatNotFound
+		}
+		return fmt.Errorf("error occured while retrieving cinema hall seats")
+	}
+
+	for _, cinemaSeat := range allCinemaSeats {
+		err = as.db.InsertNewShowSeat("Available", 0, cinemaSeat.CinemaSeatID, showID)
+		if err != nil {
+			if errors.Is(err, models.ErrShowSeatNotFound) {
+				return ErrShowSeatNotFound
+			}
+			return fmt.Errorf("error occured while inserting new show seats: %w", err)
+		}
 	}
 
 	return nil
@@ -361,7 +382,7 @@ func (as *AdminService) FetchAllShowsForAdmin() ([]models.ShowForAdmin, error) {
 func (as *AdminService) UpdateShow(showID int, showDate, startTime time.Time, hallID int, movieID int) error {
 
 	formattedDate := showDate.Format("2006-01-02")
-	formattedTime := startTime.Format("14:00")
+	formattedTime := startTime.Format("15:04:05")
 
 	err := as.db.UpdateShowByID(showID, formattedDate, formattedTime, hallID, movieID)
 	if err != nil {
@@ -387,6 +408,34 @@ func (as *AdminService) DeleteShow(showID int) error {
 			return ErrShowNotFound
 		}
 		return fmt.Errorf("error occured while deleting show: %w", err)
+	}
+
+	return nil
+}
+
+func (as *AdminService) FetchAllShowSeats(showID int) ([]models.ShowSeatForAdmin, error) {
+
+	allShowSeats, err := as.db.RetrieveAllShowSeats(showID)
+	if err != nil {
+		if errors.Is(err, models.ErrShowSeatNotFound) {
+			return nil, ErrShowSeatNotFound
+		}
+		return nil, fmt.Errorf("error occured while fetching all show seats: %w", err)
+	}
+
+	return allShowSeats, nil
+}
+
+func (as *AdminService) UpdateShowSeat(seatPrice float32, showSeatID int) error {
+
+	seatPrice = seatPrice * 10
+
+	err := as.db.UpdateShowSeatByID(int(seatPrice), showSeatID)
+	if err != nil {
+		if errors.Is(err, models.ErrShowSeatNotFound) {
+			return ErrShowSeatNotFound
+		}
+		return fmt.Errorf("error occured while updating seat price: %w", err)
 	}
 
 	return nil

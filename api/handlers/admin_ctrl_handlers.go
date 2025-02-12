@@ -472,7 +472,6 @@ func (service *AdminHandler) DeleteCinemaHallSeatAdmin(c *gin.Context) {
 	})
 }
 
-
 func (service *AdminHandler) AllShowsAdmin(c *gin.Context) {
 
 	allShows, err := service.adminCtrl.FetchAllShowsForAdmin()
@@ -539,10 +538,106 @@ func (service *AdminHandler) NewShowAdmin(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "New show added successfully",
 	})
-
 }
 
+func (service *AdminHandler) EditShowAdmin(c *gin.Context) {
+	var show EditShowForm
 
-// func(service *AdminHandler) EditCarouselImage(c *gin.Context){}
-// func(service *AdminHandler) EditCarouselImage(c *gin.Context){}
-// func(service *AdminHandler) EditCarouselImage(c *gin.Context){}
+	if err := c.ShouldBindJSON(&show); err != nil {
+		helpers.RespondWithValidationErrors(c, err, show)
+		return
+	}
+
+	err := service.adminCtrl.UpdateShow(show.ShowID, show.ShowDate, show.StartTime, show.HallID, show.MovieID)
+	if err != nil {
+		if errors.Is(err, services.ErrCinemaHallNotFound) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("cinema hall with ID %d not found", show.HallID))
+			return
+		}
+		if errors.Is(err, services.ErrMovieNotFoundByID) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("movie with ID %d not found", show.MovieID))
+			return
+		}
+		if errors.Is(err, services.ErrShowNotFound) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("show with ID %d not found", show.ShowID))
+			return
+		}
+		helpers.ServerError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Show updated successfully",
+	})
+}
+
+func (service *AdminHandler) DeleteShowAdmin(c *gin.Context) {
+	var show DeleteShowForm
+
+	if err := c.ShouldBindJSON(&show); err != nil {
+		helpers.RespondWithValidationErrors(c, err, show)
+		return
+	}
+
+	err := service.adminCtrl.DeleteShow(show.ShowID)
+	if err != nil {
+		if errors.Is(err, services.ErrShowNotFound) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("show with ID %d not found", show.ShowID))
+			return
+		}
+		helpers.ServerError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Show deleted successfully",
+	})
+}
+
+func (service *AdminHandler) AllShowSeatsAdmin(c *gin.Context) {
+	showID, err := helpers.GetParameterFromURL(c, "showID", "invalid show ID provided.")
+	if err != nil {
+		helpers.ClientError(c, http.StatusBadRequest, fmt.Sprintf("%v", err))
+		return
+	}
+
+	allShowSeats, err := service.adminCtrl.FetchAllShowSeats(showID)
+	if err != nil {
+		if errors.Is(err, services.ErrShowSeatNotFound) {
+			helpers.ClientError(c, http.StatusNotFound, "show seats not found")
+			return
+		}
+		helpers.ServerError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"allShowSeats": allShowSeats,
+	})
+}
+
+func (service *AdminHandler) EditShowSeatPriceAdmin(c *gin.Context) {
+	var showSeatPrice EditShowSeatForm
+
+	if err := c.ShouldBindJSON(&showSeatPrice); err != nil {
+		helpers.RespondWithValidationErrors(c, err, showSeatPrice)
+		return
+	}
+
+	err := service.adminCtrl.UpdateShowSeat(showSeatPrice.SeatPrice, showSeatPrice.ShowSeatID)
+	if err != nil {
+		if errors.Is(err, services.ErrShowSeatNotFound) {
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("show seat with ID %d not found", showSeatPrice.ShowSeatID))
+			return
+		}
+		helpers.ServerError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Seat price updated successfully",
+	})
+}
+
+// func(service *AdminHandler) AllShowSeatsAdmin(c *gin.Context){}
+// func(service *AdminHandler) AllShowSeatsAdmin(c *gin.Context){}
