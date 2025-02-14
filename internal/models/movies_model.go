@@ -9,7 +9,7 @@ import (
 type DBContractMovies interface {
 	RetrieveAllCarouselImages() ([]CarouselImage, error)
 	RetrieveAllShowsMovie() ([]AllShowsMovie, error)
-	RetrieveAMovie(movieID int) (Movie, error)
+	RetrieveAShowMovie(showID int) (AShowMovie, error)
 	RetrieveAllActorsCrewsByMovieID(movieID int) ([]ActorsCrewsOfMovie, error)
 	RetriveActorCrewInfo(actorCrewID int) (ActorCrewInfo, error)
 	RetrieveMoviesByActorCrewID(actorCrewID int) ([]ActorCrewMovies, error)
@@ -58,31 +58,51 @@ func (psql *Postgres) RetrieveAllCarouselImages() ([]CarouselImage, error) {
 	// Return the slice of carousel images
 	return carouselImages, nil
 }
-
+// RetrieveAllShowsMovie retrieves all shows with their associated movie details from the database.
+//
+// It performs a SQL query to fetch information from the 'show' table and the 'movies' table,
+// joining them on the movie ID to retrieve details about each movie along with its show information.
+// 
+// Returns:
+//   - []AllShowsMovie: A slice of `AllShowsMovie` structs containing the show and movie details.
+//   - error: If any error occurs during the execution of the query or scanning of rows, it returns an error.
 func (psql *Postgres) RetrieveAllShowsMovie() ([]AllShowsMovie, error) {
+	// SQL query that joins the 'show' and 'movies' tables to retrieve show and movie details
 	stmt := `SELECT s.show_id AS show_id, m.id AS movie_id, m.title AS movie_title, m.genre AS movie_genre, m.language AS movie_language, m.poster_url AS movie_poster_url, m.rating AS movie_rating, m.rating_provider AS movie_rating_provider, m.age_limit AS movie_age_limit FROM show s JOIN movies m ON s.movie_id = m.id`
 
+	// Execute the query
 	rows, err := psql.DB.Query(stmt)
 	if err != nil {
+		// If there's an error executing the query, return a wrapped error
 		return nil, fmt.Errorf("failed to retrieve all movies from the database: %w", err)
 	}
 
+	// Ensure rows are properly closed after function execution
 	defer rows.Close()
 
+	// Slice to hold the retrieved movies
 	var movies []AllShowsMovie
 
+	// Iterate over the rows returned from the query
 	for rows.Next() {
+		// Variable to hold the data of a single movie
 		var movie AllShowsMovie
-		err := rows.Scan(&movie.ShowID,&movie.MovieID,&movie.MovieTitle,&movie.MovieGenre,&movie.MovieLanguage,&movie.MoviePosterUrl,&movie.MovieRating,&movie.MovieRatingProvider,&movie.MovieAgeLimit)
+
+		// Scan the row data into the 'movie' variable
+		err := rows.Scan(&movie.ShowID, &movie.MovieID, &movie.MovieTitle, &movie.MovieGenre, &movie.MovieLanguage, &movie.MoviePosterUrl, &movie.MovieRating, &movie.MovieRatingProvider, &movie.MovieAgeLimit)
 		if err != nil {
+			// If scanning fails, return an error with a wrapped message
 			return nil, fmt.Errorf("failed to scan all movies: %w", err)
 		}
+
+		// Append the scanned movie details to the 'movies' slice
 		movies = append(movies, movie)
 	}
 
-	// Return the slice of movies
+	// Return the list of movies after processing all rows
 	return movies, nil
 }
+
 
 // RetrieveAMovie retrieves a movie by its ID from the database.
 //
@@ -92,29 +112,29 @@ func (psql *Postgres) RetrieveAllShowsMovie() ([]AllShowsMovie, error) {
 // Returns:
 // - A Movie struct containing all the movie details if found.
 // - An error if the movie is not found (ErrMovieNotFoundByID) or if there's an issue querying the database.
-func (psql *Postgres) RetrieveAMovie(movieID int) (Movie, error) {
+func (psql *Postgres) RetrieveAShowMovie(showID int) (AShowMovie, error) {
 	// SQL query to fetch a movie by its ID
-	stmt := `SELECT id, title, description, genre, language, trailer_url, poster_url, rating, rating_provider, duration, release_date, age_limit FROM movies WHERE id = $1`
+	stmt := `SELECT s.show_id AS show_id, m.id AS movie_id, m.title AS movie_title, m.description AS movie_description, m.genre AS movie_genre, m.language AS movie_language, m.trailer_url AS movie_trailer_url, m.poster_url AS movie_poster_url, m.rating AS movie_rating, m.rating_provider AS movie_rating_provider, m.duration AS movie_duration, m.release_date AS movie_release_date, m.age_limit AS movie_age_limit FROM show s JOIN movies m ON s.movie_id = m.id WHERE s.show_id = $1`
 
 	// Execute the query and get the result
-	row := psql.DB.QueryRow(stmt, movieID)
+	row := psql.DB.QueryRow(stmt, showID)
 
-	var movie Movie
+	var aShowMovie AShowMovie
 
 	// Scan the row into the movie struct
-	err := row.Scan(&movie.ID, &movie.Title, &movie.Description, &movie.Genre, &movie.Language, &movie.TrailerUrl, &movie.PosterUrl, &movie.Rating, &movie.RatingProvider, &movie.Duration, &movie.ReleaseDate, &movie.AgeLimit)
+	err := row.Scan(&aShowMovie.ShowID,&aShowMovie.MovieID, &aShowMovie.MovieTitle, &aShowMovie.MovieDescription, &aShowMovie.MovieGenre, &aShowMovie.MovieLanguage, &aShowMovie.MovieTrailerUrl, &aShowMovie.MoviePosterUrl, &aShowMovie.MovieRating, &aShowMovie.MovieRatingProvider, &aShowMovie.MovieDuration, &aShowMovie.MovieReleaseDate, &aShowMovie.MovieAgeLimit)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// Return a specific error if no movie is found
-			return Movie{}, ErrMovieNotFoundByID
+			return AShowMovie{}, ErrMovieNotFoundByID
 		} else {
 			// Return a generic error if there are any other issues
-			return Movie{}, fmt.Errorf("failed to retrieve a movie by id from the database: %w", err)
+			return AShowMovie{}, fmt.Errorf("failed to retrieve a movie by id from the database: %w", err)
 		}
 	}
 
 	// Return the movie if found
-	return movie, nil
+	return aShowMovie, nil
 }
 
 // RetrieveAllActorsCrewsByMovieID retrieves all actors and crew members for a specific movie
@@ -230,7 +250,7 @@ func (psql *Postgres) RetrieveMoviesByActorCrewID(actorCrewID int) ([]ActorCrewM
 		if err != nil {
 			// If no rows were found for the actor/crew ID, return a specific error
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, ErrActorCrewNotFoundByID 
+				return nil, ErrActorCrewNotFoundByID
 			}
 			// Wrap any other errors with context for better debugging
 			return nil, fmt.Errorf("failed to scan a movie of the actor or crew: %w", err)

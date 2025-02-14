@@ -19,19 +19,20 @@ type AllShowsMovie struct {
 	MovieAgeLimit       string
 }
 
-type Movie struct {
-	ID             int
-	Title          string
-	Description    string
-	Genre          string
-	Language       string
-	TrailerUrl     string
-	PosterUrl      string
-	Rating         float32
-	RatingProvider string
-	Duration       int
-	ReleaseDate    string
-	AgeLimit       string
+type AShowMovie struct {
+	ShowID              int
+	MovieID             int
+	MovieTitle          string
+	MovieDescription    string
+	MovieGenre          string
+	MovieLanguage       string
+	MovieTrailerUrl     string
+	MoviePosterUrl      string
+	MovieRating         float32
+	MovieRatingProvider string
+	MovieDuration       int
+	MovieReleaseDate    string
+	MovieAgeLimit       string
 }
 
 type ActorsCrewsOfMovie struct {
@@ -181,6 +182,6 @@ type ShowSeatForAdmin struct {
 	ShowSeatID   int
 	CinemaSeatID int
 	SeatStatus   string
-	SeatPrice    int
+	SeatPrice    float32
 	ShowID       int
 }

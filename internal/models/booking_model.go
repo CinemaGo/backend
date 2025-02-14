@@ -167,7 +167,7 @@ func (psql *Postgres) RetrieveShowStartTimes(showDate string) ([]ShowStartTime, 
 //     for the specified show, including row, seat number, type, status, and price.
 //   - error: An error if the query fails, or if there is any issue scanning the results.
 func (psql *Postgres) RetrieveShowSeats(showID int) ([]ShowSeat, error) {
-	stmt := `SELECT cs.seat_row, cs.seat_number, cs.seat_type, ss.show_seat_id, ss.status, ss.price FROM cinema_seat cs JOIN show_seat ss ON cs.cinema_seat_id = ss.cinema_seat_id JOIN show s ON ss.show_id = s.show_id WHERE s.show_id = $1;`
+	stmt := `SELECT cs.seat_row, cs.seat_number, cs.seat_type, ss.show_seat_id, ss.status, ss.price FROM cinema_seat cs JOIN show_seat ss ON cs.cinema_seat_id = ss.cinema_seat_id JOIN show s ON ss.show_id = s.show_id WHERE s.show_id = $1`
 
 	// Execute the query using the provided showID.
 	rows, err := psql.DB.Query(stmt, showID)
@@ -178,6 +178,12 @@ func (psql *Postgres) RetrieveShowSeats(showID int) ([]ShowSeat, error) {
 
 	// Ensure that rows are closed after processing to avoid resource leaks.
 	defer rows.Close()
+
+	// Check if no rows were returned
+	if !rows.Next() {
+		// If no rows are found, return a custom error indicating no seats are found
+		return nil, ErrShowSeatNotFound
+	}
 
 	var showSeats []ShowSeat
 

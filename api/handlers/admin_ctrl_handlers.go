@@ -88,6 +88,7 @@ func (service *AdminHandler) DeleteCarouselImageAdmin(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, services.ErrAdminPageCarouselImagesNotFound) {
 			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("Carousel image by provided %v ID not found", carouselImage.CarouselImageID))
+			return
 		}
 		helpers.ServerError(c, err)
 		return
@@ -119,6 +120,11 @@ func (service *AdminHandler) NewMovieAdmin(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&newMovie); err != nil {
 		helpers.RespondWithValidationErrors(c, err, newMovie)
+		return
+	}
+
+	if newMovie.Rating < 0 || newMovie.Rating > 10 {
+		helpers.ClientError(c, http.StatusBadRequest, "Movie Rating should be between 0 and 10")
 		return
 	}
 
@@ -175,6 +181,11 @@ func (service *AdminHandler) EditMovieAdmin(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&movie); err != nil {
 		helpers.RespondWithValidationErrors(c, err, movie)
+		return
+	}
+
+	if movie.Rating < 0 || movie.Rating > 10 {
+		helpers.ClientError(c, http.StatusBadRequest, "Movie Rating should be between 0 and 10")
 		return
 	}
 
@@ -268,7 +279,7 @@ func (service *AdminHandler) EditActorCrewAdmin(c *gin.Context) {
 
 	err := service.adminCtrl.UpdateActorCrewInfo(actorCrew.FullName, actorCrew.ImageURL, actorCrew.Occupation, actorCrew.RoleDescription, actorCrew.BornDate, actorCrew.Birthplace, actorCrew.About, actorCrew.IsActor, actorCrew.ActorCrewID)
 	if err != nil {
-		if errors.Is(err, models.ErrActorCrewNotFound) {
+		if errors.Is(err, services.ErrActorCrewNotFound) {
 			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("actor/crew not found by provided ID %v", actorCrew.ActorCrewID))
 			return
 		}
@@ -330,6 +341,10 @@ func (service *AdminHandler) NewCinemaHallAdmin(c *gin.Context) {
 
 	err := service.adminCtrl.AddNewCinemaHall(newCinemaHall.HallName, newCinemaHall.HallName, 0)
 	if err != nil {
+		if errors.Is(err, services.ErrDuplicatedCinemaHall) {
+			helpers.ClientError(c, http.StatusConflict, "Cinema hall with this name and type already exists")
+			return
+		}
 		helpers.ServerError(c, err)
 		return
 	}
@@ -372,29 +387,6 @@ func (service *AdminHandler) CinemaHallAdmin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"cinemaHall":     cinemaHall,
 		"allCinemaSeats": allCinemaSeats,
-	})
-}
-
-func (service *AdminHandler) EditCinemaHallAdmin(c *gin.Context) {
-	var cinemaHall EditCinemaHallForm
-
-	if err := c.ShouldBindJSON(&cinemaHall); err != nil {
-		helpers.RespondWithValidationErrors(c, err, cinemaHall)
-		return
-	}
-
-	err := service.adminCtrl.UpdateCinemaHallInfo(cinemaHall.HallName, cinemaHall.HallType, 0, cinemaHall.CinemaHallID)
-	if err != nil {
-		if errors.Is(err, services.ErrCinemaHallNotFound) {
-			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("cinema hall not found by provided ID %v", cinemaHall.CinemaHallID))
-			return
-		}
-		helpers.ServerError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Cinema Hall data updated successfully",
 	})
 }
 
@@ -529,6 +521,12 @@ func (service *AdminHandler) NewShowAdmin(c *gin.Context) {
 		}
 		if errors.Is(err, services.ErrMovieNotFoundByID) {
 			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("movie with ID %d not found", newShow.MovieID))
+			return
+		}
+
+		if errors.Is(err, services.ErrShowAlreadyExists) {
+			formattedTime := newShow.StartTime.Format("15:04:05")
+			helpers.ClientError(c, http.StatusConflict, fmt.Sprintf("Show already exists with the given time: %v", formattedTime))
 			return
 		}
 		helpers.ServerError(c, err)

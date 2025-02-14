@@ -51,27 +51,27 @@ func (service *MoviesHandler) ExploreAllShows(c *gin.Context) {
 	})
 }
 
-func (service *MoviesHandler) Movie(c *gin.Context) {
-	movieID, err := helpers.GetParameterFromURL(c, "movieID", "invalid movie ID provided.")
+func (service *MoviesHandler) MovieShow(c *gin.Context) {
+	showID, err := helpers.GetParameterFromURL(c, "showID", "invalid showID ID provided.")
 	if err != nil {
 		helpers.ClientError(c, http.StatusBadRequest, fmt.Sprintf("%v", err))
 		return
 	}
 
-	aShowMovie, err := service.movie.FetchAShowMovie(movieID)
+	aShowMovie, err := service.movie.FetchAShowMovie(showID)
 	if err != nil {
 		if errors.Is(err, services.ErrMovieNotFoundByID) {
-			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("movie with the given ID %v not found", movieID))
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("showID with the given ID %v not found", showID))
 			return
 		}
 		helpers.ServerError(c, err)
 		return
 	}
 
-	actorsCrews, err := service.movie.FetchAllActorsCrewsByMovieID(movieID)
+	actorsCrews, err := service.movie.FetchAllActorsCrewsByMovieID(aShowMovie.MovieID)
 	if err != nil {
 		if errors.Is(err, services.ErrMovieNotFoundByID) {
-			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("movie with the given ID %v not found", movieID))
+			helpers.ClientError(c, http.StatusNotFound, fmt.Sprintf("showID with the given ID %v not found", showID))
 			return
 		}
 		helpers.ServerError(c, err)

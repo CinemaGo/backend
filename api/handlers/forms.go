@@ -38,7 +38,7 @@ type EditCarouselImageForm struct {
 	ImageURL        string `json:"carousel_image_image_url" binding:"required"`
 	Title           string `json:"carousel_image_title" binding:"required"`
 	Description     string `json:"carousel_image_description" binding:"required"`
-	OrderPriority   int    `json:"carousel_image_order_priority" binding:"required"`
+	OrderPriority   string    `json:"carousel_image_order_priority" binding:"required"`
 }
 
 type DeleteCarouselImageForm struct {

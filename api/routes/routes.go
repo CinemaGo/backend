@@ -22,13 +22,13 @@ func Router(h *ServeHandlersWrapper) *gin.Engine {
 	{
 		v1.GET("/home", h.MainPage)
 		v1.GET("/explore/movies", h.ExploreAllShows)
-		v1.GET("/movies/:movieName/MV:movieID", h.Movie)
+		v1.GET("/movies/:movieName/:showID", h.MovieShow)
 		v1.GET("/person/:personName/:actorCrewID", h.ActorCrew)
 
 		v1.POST("/user/signup", h.SignUp)
 		v1.POST("/user/login", h.Login)
 
-		v1.GET("/my-profile/edit", middlewares.UserAuthorizationJWT(), h.UserProfile)
+		v1.GET("/my-profile", middlewares.UserAuthorizationJWT(), h.UserProfile)
 		v1.PUT("/my-profile/edit", middlewares.UserAuthorizationJWT(), h.UpdateUserProfile)
 		v1.POST("/my-profile/logout", middlewares.UserAuthorizationJWT(), h.Logout)
 
@@ -56,7 +56,6 @@ func Router(h *ServeHandlersWrapper) *gin.Engine {
 		v1.POST("/admin/cinema-hall/new", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.NewCinemaHallAdmin)
 		v1.GET("/admin/cinema-hall/all", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.AllCinemaHallsAdmin)
 		v1.GET("/admin/cinema-hall/:cinemaHallID", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.CinemaHallAdmin)
-		v1.PUT("/admin/cinema-hall/edit", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.EditCinemaHallAdmin)
 		v1.DELETE("/admin/cinema-hall/delete", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.DeleteCinemaHallAdmin)
 
 		v1.POST("/admin/cinema-hall-seat/new", middlewares.UserAuthorizationJWT(), middlewares.AdminRoleRequired(), h.NewCinemaHallSeatAdmin)
