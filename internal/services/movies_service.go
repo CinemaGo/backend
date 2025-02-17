@@ -483,7 +483,7 @@ func (ms *MoviesService) FetchMoviesByActorCrewID(actorCrewID int) ([]models.Act
 			return nil, fmt.Errorf("error occurred while fetching all movies of actors or crews in the service section: %w", err)
 		}
 
-		if err := ms.cacheMoviesByActorCrewIDInRedis(actorCrewID,actorCrewMovies); err != nil {
+		if err := ms.cacheMoviesByActorCrewIDInRedis(actorCrewID, actorCrewMovies); err != nil {
 			return nil, err
 		}
 

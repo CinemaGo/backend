@@ -58,6 +58,7 @@ func (psql *Postgres) RetrieveAllCarouselImages() ([]CarouselImage, error) {
 	// Return the slice of carousel images
 	return carouselImages, nil
 }
+
 // RetrieveAllShowsMovie retrieves all shows with their associated movie details from the database.
 //
 // It performs a SQL query to fetch information from the 'show' table and the 'movies' table,
